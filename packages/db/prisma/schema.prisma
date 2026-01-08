@@ -1,0 +1,128 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  password        String
+  name            String
+  phoneNumber     String?
+  age             Int?
+  region          String?
+  dp              String?  // Profile Picture URL
+  bio             String?
+  
+  // App Access & Settings
+  isPurchased     Boolean  @default(false)
+  timeAccessYears Int      @default(100)
+  agreedToTerms   Boolean  @default(false)
+  
+  // RPG Global Stats
+  totalExp        Int      @default(0) // Can go negative
+  
+  // Relations
+  habits          Habit[]
+  dailyLogs       DailyLog[]
+  expHistory      ExpHistory[]
+  
+  createdAt       DateTime @default(now())
+}
+
+// --- Habit Templates (The "Rules") ---
+enum HabitType {
+  GOOD
+  BAD
+  REWARD
+}
+
+enum TaskCategory {
+  DIRECT           // Single action (e.g., Drink Water)
+  MICRO_CONTAINER  // The parent card (e.g., Daily Vitamins)
+  MICRO_ITEM       // The sub-tasks (e.g., B12, Copper)
+}
+
+model Habit {
+  id            String       @id @default(cuid())
+  userId        String?      // Null for Global Default Templates (Onboarding)
+  user          User?        @relation(fields: [userId], references: [id])
+  
+  type          HabitType
+  category      TaskCategory
+  title         String
+  expValue      Int          @default(0) // Exp gain, loss, or cost
+  
+  // Logic for Micro Tasks
+  // Fixed: Reappears every day (B12). 
+  // Non-Fixed: User adds manually or carries over (Todos).
+  isFixed       Boolean      @default(true) 
+  isDefault     Boolean      @default(false) // Used to seed new user accounts
+
+  // Self-relation for Micro-task hierarchy
+  parentId      String?
+  parent        Habit?       @relation("SubTasks", fields: [parentId], references: [id])
+  subTasks      Habit[]      @relation("SubTasks")
+
+  // Tracking
+  taskLogs      TaskLog[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+// --- Daily Tracking (The "Execution") ---
+model DailyLog {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  date         DateTime  @default(now()) @db.Date 
+  
+  // Daily Progress Stats
+  todayExp     Int       @default(0) // Logic: Never below 0
+  progress     Float     @default(0.0) // 0 to 100%
+  
+  // Github-Style Streak Logic
+  // Green = progress > 0
+  // Golden = progress == 100 AND badHabitHits == 0
+  isGolden     Boolean   @default(false) 
+  
+  taskLogs     TaskLog[]
+
+  @@unique([userId, date])
+}
+
+model TaskLog {
+  id           String    @id @default(cuid())
+  dailyLogId   String
+  dailyLog     DailyLog  @relation(fields: [dailyLogId], references: [id])
+  habitId      String
+  habit        Habit     @relation(fields: [habitId], references: [id])
+  
+  // Completion Data
+  isCompleted  Boolean   @default(false)
+  count        Int       @default(0) // For Bad Habits: increment each hit
+  earnedExp    Int       @default(0) // Snapshot of exp at time of hit
+  
+  createdAt    DateTime  @default(now())
+}
+
+// --- Audit & Analytics ---
+model ExpHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  amount    Int
+  reason    String   // e.g., "Completed: Drink Water" or "Reward: Netflix"
+  createdAt DateTime @default(now())
+}
