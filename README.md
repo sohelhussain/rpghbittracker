@@ -1,6 +1,6 @@
-# Turborepo starter
+# starter
 
-This Turborepo starter is maintained by the Turborepo core team.
+This starter is maintained by the Turborepo core team.
 
 ## Using this example
 
@@ -12,7 +12,7 @@ npx create-turbo@latest
 
 ## What's inside?
 
-This Turborepo includes the following packages/apps:
+This includes the following packages/apps:
 
 ### Apps and Packages
 
